@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wikipedia Infinite Feed</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">📚 Wikipedia Feed</div>
+            <div class="search-container">
+                <input type="text" id="search-input" class="search-input" placeholder="Search articles...">
+                <button id="search-btn" class="btn-icon">🔍</button>
+            </div>
+            <div class="header-controls">
+                <button id="settings-btn" class="btn-icon">⚙️</button>
+                <button id="dark-mode-btn" class="btn-icon">🌙</button>
+            </div>
+        </header>
+        
+        <!-- Category Filter Bar -->
+        <nav class="category-nav">
+            <div class="category-scroll">
+                <button class="category-chip active" data-category="random">🎲 Random</button>
+                <!-- Categories loaded dynamically -->
+            </div>
+        </nav>
+        
+        <!-- Main Feed -->
+        <main class="feed-container">
+            <div id="article-feed" class="article-feed">
+                <!-- Articles loaded here -->
+            </div>
+            
+            <!-- Hidden: infinite scroll now automatic -->
+            <div id="loading" class="loading-indicator" style="display:none">
+                <div class="spinner"></div>
+                <span>Loading more articles...</span>
+            </div>
+                <div class="spinner"></div>
+                <span>Loading more articles...</span>
+            </div>
+            
+            <!-- End of feed -->
+            <div id="end-of-feed" class="end-indicator hidden">
+                <p>You've seen all available articles!</p>
+                <button id="reset-feed" class="btn-secondary">Start Fresh</button>
+            </div>
+        </main>
+        
+        <!-- Article Modal -->
+        <div id="article-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="modal-close" id="modal-close">×</button>
+                <article class="full-article">
+                    <h1 id="article-title"></h1>
+                    <div class="article-meta">
+                        <span id="article-reading-time"></span>
+                        <span id="article-categories"></span>
+                    </div>
+                    <div id="article-content" class="article-text"></div>
+                </article>
+            </div>
+        </div>
+        
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="settings-panel hidden">
+            <div class="settings-content">
+                <h2>Settings</h2>
+                
+                <div class="setting-group" style="display:none">
+                    <label>Feed Mix</label>
+                    <input type="range" id="feed-mix" min="0" max="1" step="0.1" value="0.3">
+                    <span id="feed-mix-label">30% Recommended, 70% Random</span>
+                </div>
+                
+                <div class="setting-group" style="display:none">
+                    <label>Articles per page</label>
+                    <select id="articles-per-page">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label>Font Size</label>
+                    <input type="range" id="font-size" min="12" max="24" value="16">
+                    <span id="font-size-label">16px</span>
+                </div>
+                
+                <div class="setting-group">
+                    <label>Excluded Categories</label>
+                    <textarea id="excluded-categories" placeholder="Enter categories to exclude"></textarea>
+                </div>
+                
+                <button id="save-settings" class="btn-primary">Save Settings</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js?v=27"></script>
+</body>
+</html>

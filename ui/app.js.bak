@@ -1,0 +1,523 @@
+// Wikipedia Feed - Main Application
+
+class WikipediaFeed {
+    constructor() {
+        this.apiBase = '/api';
+        this.articles = [];
+        this.currentOffset = 0;
+        this.loading = false;
+        this.hasMore = true;
+        this.currentCategory = 'all';
+        this.currentMode = 'random';
+        this.currentCategory = 'random';
+        this.settings = {
+            feedMix: 0.3,
+            articlesPerPage: 20,
+            fontSize: 16,
+            excludedCategories: []
+        };
+        
+        this.init();
+    }
+    
+    init() {
+        this.loadSettings();
+        this.loadCategories();  // Load categories first
+        this.bindEvents();
+        this.loadArticles();
+    }
+    
+    async loadCategories() {
+        try {
+            const response = await fetch('/api/categories');
+            const data = await response.json();
+            
+            const container = document.querySelector('.category-scroll');
+            // Keep All and Random buttons
+            const existingButtons = container.querySelectorAll('.category-chip[data-category]');
+            const existingCats = Array.from(existingButtons).map(b => b.dataset.category);
+            
+            // Add categories (top 20)
+            if (data.categories && data.categories.length > 0) {
+                data.categories.slice(0, 20).forEach(cat => {
+                    if (!existingCats.includes(cat.name)) {
+                        const btn = document.createElement('button');
+                        btn.className = 'category-chip';
+                        btn.dataset.category = cat.name;
+                        btn.textContent = cat.name;
+                        container.appendChild(btn);
+                    }
+                });
+            }
+            
+            // Rebind category events
+            container.addEventListener('click', (e) => {
+                if (e.target.classList.contains('category-chip')) {
+                    document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+                    e.target.classList.add('active');
+                    this.currentCategory = e.target.dataset.category;
+                    this.articles = [];
+                    this.loadArticles();
+                }
+            });
+        } catch (e) {
+            console.error('Failed to load categories:', e);
+        }
+    }
+    
+    bindEvents() {
+        // Infinite scroll using scroll event (more reliable)
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight;
+            const clientHeight = document.documentElement.clientHeight;
+            
+            // When user is 300px from bottom, load more
+            if (scrollTop + clientHeight >= scrollHeight - 300) {
+                if (this.hasMore && !this.loading) {
+                    this.loadMore();
+                }
+            }
+        });
+        
+        // Settings panel
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            document.getElementById('settings-panel').classList.remove('hidden');
+        });
+        
+        // Search functionality
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        
+        searchBtn.addEventListener('click', () => this.performSearch());
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.performSearch();
+        });
+        
+        document.getElementById('modal-close').addEventListener('click', () => {
+            document.getElementById('article-modal').classList.add('hidden');
+        });
+        
+        document.getElementById('article-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'article-modal') {
+                document.getElementById('article-modal').classList.add('hidden');
+            }
+        });
+        
+        // Dark mode toggle
+        document.getElementById('dark-mode-btn').addEventListener('click', () => {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            localStorage.setItem('darkMode', !isDark);
+        });
+        
+        // Settings controls
+        document.getElementById('feed-mix').addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('feed-mix-label').textContent = 
+                `${Math.round((1 - value) * 100)}% Recommended, ${Math.round(value * 100)}% Random`;
+        });
+        
+        document.getElementById('font-size').addEventListener('input', (e) => {
+            document.getElementById('font-size-label').textContent = `${e.target.value}px`;
+        });
+        
+        document.getElementById('save-settings').addEventListener('click', () => {
+            this.saveSettings();
+            document.getElementById('settings-panel').classList.add('hidden');
+            this.refreshFeed();
+        });
+        
+        // Category chips
+        document.querySelectorAll('.category-chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                document.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentCategory = e.target.dataset.category;
+                this.currentMode = this.currentCategory === 'random' ? 'random' : 'recommended';
+                this.refreshFeed();
+            });
+        });
+    }
+    
+    async loadArticles() {
+        this.loading = true;
+        document.getElementById('loading').classList.remove('hidden');
+        
+        try {
+            const response = await fetch(`${this.apiBase}/articles?mode=${this.currentMode}&count=${this.settings.articlesPerPage}&category=${this.currentCategory}`);
+            const data = await response.json();
+            this.articles = data.articles;
+            this.renderArticles();
+            this.currentOffset = this.articles.length;
+            this.hasMore = data.has_more;
+            
+        } catch (error) {
+            console.error('Failed to load articles:', error);
+        } finally {
+            this.loading = false;
+            document.getElementById('loading').classList.add('hidden');
+        }
+    }
+    
+    async performSearch() {
+        const query = document.getElementById('search-input').value.trim();
+        if (!query) return;
+        
+        this.loading = true;
+        document.getElementById('loading').classList.remove('hidden');
+        this.articles = [];
+        
+        try {
+            const response = await fetch(`${this.apiBase}/search?q=${encodeURIComponent(query)}&limit=50`);
+            const data = await response.json();
+            
+            this.articles = data.articles;
+            this.renderArticles();
+            
+            // Add "Back to Feed" button
+            this.showBackToFeed();
+            
+        } catch (error) {
+            console.error('Search failed:', error);
+        } finally {
+            this.loading = false;
+            document.getElementById('loading').classList.add('hidden');
+        }
+    }
+    
+    showBackToFeed() {
+        // Remove existing back button if any
+        const existing = document.querySelector('.back-to-feed');
+        if (existing) existing.remove();
+        
+        const backBtn = document.createElement('button');
+        backBtn.className = 'back-to-feed btn-secondary';
+        backBtn.textContent = '← Back to Feed';
+        backBtn.onclick = () => {
+            document.getElementById('search-input').value = '';
+            this.currentCategory = 'random';
+            this.currentOffset = 0;
+            this.articles = [];
+            this.loadArticles();
+            backBtn.remove();
+        };
+        
+        const feed = document.getElementById('article-feed');
+        feed.insertBefore(backBtn, feed.firstChild);
+    }
+    
+    async loadMore() {
+        if (this.loading || !this.hasMore) return;
+        
+        this.loading = true;
+        document.getElementById('loading').classList.remove('hidden');
+        
+        try {
+            const response = await fetch(`${this.apiBase}/articles?mode=${this.currentMode}&offset=${this.currentOffset}&count=${this.settings.articlesPerPage}&category=${this.currentCategory}`);
+            const data = await response.json();
+            this.articles.push(...data.articles);
+            this.appendArticles(data.articles);
+            this.currentOffset = this.articles.length;
+            this.hasMore = data.has_more;
+            
+        } catch (error) {
+            console.error('Failed to load more articles:', error);
+        } finally {
+            this.loading = false;
+            document.getElementById('loading').classList.add('hidden');
+        }
+    }
+    
+    renderArticles() {
+        const feed = document.getElementById('article-feed');
+        feed.innerHTML = '';
+        this.appendArticles(this.articles);
+    }
+    
+    appendArticles(articles) {
+        const feed = document.getElementById('article-feed');
+        
+        articles.forEach(article => {
+            const card = this.createArticleCard(article);
+            feed.appendChild(card);
+            
+            // Track view
+            this.trackEvent(article.id, 'view');
+        });
+        
+        if (!this.hasMore) {
+            document.getElementById('end-of-feed').classList.remove('hidden');
+        }
+    }
+    
+    createArticleCard(article) {
+        const card = document.createElement('div');
+        card.className = 'article-card';
+        card.dataset.articleId = article.id;
+        card.dataset.articleUrl = article.url || '';
+        
+        const preview = article.preview ? article.preview : '';
+        
+        // Image HTML if available - for both card AND modal
+        const imageHtml = article.image 
+            ? `<div class="card-image"><img src="/api/image/${encodeURIComponent(article.image)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` 
+            : '';
+        
+        // Dedupe categories
+        const uniqueCategories = article.categories ? [...new Set(article.categories)].slice(0, 5) : [];
+        
+        card.innerHTML = `
+            ${imageHtml}
+            <div class="card-content">
+                <h2 class="article-title">${this.escapeHtml(article.title)}</h2>
+                <p class="article-preview">${this.escapeHtml(preview)}</p>
+                <div class="article-meta">
+                    <span>📄 ${article.word_count?.toLocaleString() || '?'} words</span>
+                </div>
+                ${uniqueCategories.length > 0 ? `
+                    <div class="article-tags">
+                        ${uniqueCategories.map(c => `<span class="tag">${this.escapeHtml(c)}</span>`).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+        card.addEventListener('click', () => this.openArticle(article));
+        
+        return card;
+    }
+    
+    async openArticle(article) {
+        console.log('Opening article:', article.title, 'URL:', article.url);
+        
+        // If no content, fetch it from API
+        let fullText = article.content;
+        let wordCount = article.word_count;
+        
+        if (!fullText || fullText.length < 500) {
+            // Fetch full article
+            try {
+                // URL is already in format /api/article/A/Title.html - use as-is
+                let url = article.url || `/api/article/A/${encodeURIComponent(article.title)}.html`;
+                // Ensure leading slash
+                if (!url.startsWith('/')) url = '/' + url;
+                console.log('Fetching:', url);
+                
+                const response = await fetch(url);
+                console.log('Response:', response.status, response.ok);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Data keys:', Object.keys(data));
+                    
+                    // Handle redirects
+                    if (data.redirect) {
+                        console.log('Following redirect to:', data.redirect);
+                        const redirectUrl = data.redirect.startsWith('/') ? data.redirect : `/api/article/${data.redirect}`;
+                        const redirectResponse = await fetch(redirectUrl);
+                        if (redirectResponse.ok) {
+                            const redirectData = await redirectResponse.json();
+                            fullText = redirectData.content || '';
+                            wordCount = Math.ceil((fullText || '').split(/\s+/).length);
+                            console.log('Got redirected content:', fullText.length, 'chars');
+                        }
+                    } else {
+                        fullText = data.content || '';
+                        wordCount = Math.ceil((fullText || '').split(/\s+/).length);
+                        console.log('Got content:', fullText.length, 'chars');
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch full article:', err);
+            }
+        }
+        
+        // For modal, keep basic wiki formatting but strip page header crud
+        if (!fullText) fullText = '<p>No content available.</p>';
+        
+        // Strip HTML comments (developer notes)
+        fullText = fullText.replace(/<!--[\s\S]*?-->/g, '');
+        
+        // Remove everything before the first real paragraph (after the title heading)
+        fullText = fullText.replace(/<div id="mw-content-text">/gi, '<!--CONTENT_START-->');
+        if (fullText.includes('<!--CONTENT_START-->')) {
+            fullText = fullText.split('<!--CONTENT_START-->')[1];
+        }
+        
+        // Strip ALL the wiki junk with aggressive regex
+        // Infoboxes - any table with infobox class
+        fullText = fullText.replace(/<table[^>]*class="[^"]*infobox[^"]*"[^>]*>[\s\S]*?<\/table>/gi, '');
+        // Hatnotes, navboxes, sidebars
+        fullText = fullText.replace(/<div[^>]*class="[^"]*hatnote[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+        fullText = fullText.replace(/<div[^>]*class="[^"]*navbox[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+        fullText = fullText.replace(/<div[^>]*class="[^"]*sidebar[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+        fullText = fullText.replace(/<div[^>]*class="[^"]*mbox[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+        
+        // Strip section headers and their content (References, See also, External links)
+        fullText = fullText.replace(/<h2[^>]*>[\s\S]*?<span[^>]*>[\s]*(References|See also|External links)[\s]*<\/span>[\s\S]*?<\/h2>[\s\S]*?<(h2|div|footer|nav)/gi, '<$1');
+        fullText = fullText.replace(/<h3[^>]*>[\s\S]*?<span[^>]*>[\s]*(References|See also|External links)[\s]*<\/span>[\s\S]*?<\/h3>[\s\S]*?<(h2|h3|div)/gi, '<$1');
+        
+        // References, citations, and sup tags
+        fullText = fullText.replace(/<span[^>]*class="[^"]*reference[^"]*"[^>]*>[\s\S]*?<\/span>/gi, '');
+        fullText = fullText.replace(/<sup[^>]*[^>]*>[\s\S]*?<\/sup>/gi, '');
+        fullText = fullText.replace(/<div[^>]*class="[^"]*references[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+        
+        // Cite tags and any remaining span/div garbage
+        fullText = fullText.replace(/<cite[^>]*>[\s\S]*?<\/cite>/gi, '');
+        fullText = fullText.replace(/<span[^>]*>[\s\S]*?<\/span>/gi, '');
+        fullText = fullText.replace(/<div[^>]*>[\s\S]*?<\/div>/gi, '');
+        
+        // Meta properties and ID tags
+        fullText = fullText.replace(/<meta[^>]*>/gi, '');
+        fullText = fullText.replace(/<span[^>]*id="[^"]*"[^>]*><\/span>/gi, '');
+        
+        // Table cleanup - keep tables but clean them
+        fullText = fullText.replace(/<table[^>]*>/gi, '<table class="wiki-table">');
+        
+        // Strip remaining script/style/div/img tags (but keep tables now)
+        fullText = fullText.replace(/<(script|style|div|img|nav|noscript|td|tr|tbody|th)[^>]*>[\s\S]*?<\/\1>/gi, '');
+        
+        // Keep only basic formatting tags
+        fullText = fullText.replace(/<(?!\/?(?:table|tbody|thead|tr|th|td|p|h[1-6]|ul|ol|li|br|b|i|em|strong|a|blockquote)[^>]*>)/gi, '&lt;');
+        
+        // Clean up extra whitespace
+        fullText = fullText.replace(/\n\s*\n/g, '\n\n');
+        fullText = fullText.replace(/^\s+|\s+$/g, '');
+        
+        // Add image to top of article if available
+        const modalImage = article.image 
+            ? `<div style="text-align:center;margin-bottom:1rem;"><img src="/api/image/${encodeURIComponent(article.image)}" alt="" style="max-width:100%;height:auto;border-radius:8px;" onerror="this.parentElement.remove()"></div>` 
+            : '';
+        
+        document.getElementById('article-title').textContent = article.title;
+        document.getElementById('article-reading-time').textContent = `${wordCount?.toLocaleString() || '?'} words`;
+        document.getElementById('article-categories').textContent = 
+            article.categories ? [...new Set(article.categories)].join(' • ') : ''; // Dedupe categories
+        document.getElementById('article-content').innerHTML = modalImage + fullText;
+        
+        document.getElementById('article-modal').classList.remove('hidden');
+        
+        // Make links clickable to load other articles
+        const articleContent = document.getElementById('article-content');
+        
+        // Use event delegation - listen on the container
+        articleContent.addEventListener('click', async (e) => {
+            console.log('Click detected on:', e.target.tagName, e.target);
+            
+            // Check if it's an anchor or inside one
+            let anchor = e.target.closest('a');
+            if (!anchor) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            let href = anchor.getAttribute('href');
+            console.log('Link href:', href);
+            let articleTitle = null;
+            
+            // Try to extract article title from href
+            if (href) {
+                // Handle /wiki/Article_Name links
+                if (href.startsWith('/wiki/')) {
+                    articleTitle = href.replace('/wiki/', '').replace(/_/g, ' ');
+                } else if (href.startsWith('A/')) {
+                    // Already in our format
+                    articleTitle = href.replace('A/', '').replace('.html', '').replace(/_/g, ' ');
+                }
+            }
+            
+            // Fall back to link text
+            if (!articleTitle) {
+                articleTitle = anchor.textContent.trim();
+            }
+            
+            if (articleTitle) {
+                console.log('Following link to:', articleTitle);
+                try {
+                    // Fetch by title
+                    const response = await fetch(`${this.apiBase}/article/A/${encodeURIComponent(articleTitle.replace(/ /g, '_'))}.html`);
+                    if (response.ok) {
+                        const linkedArticle = await response.json();
+                        this.openArticle(linkedArticle);
+                    } else {
+                        console.log('Article not found:', articleTitle);
+                    }
+                } catch (err) {
+                    console.error('Error loading linked article:', err);
+                }
+            }
+        });
+        
+        // Track read
+        this.trackEvent(article.id, 'read');
+        
+        // Update font size
+        document.getElementById('article-content').style.fontSize = 
+            `${this.settings.fontSize}px`;
+    }
+    
+    formatContent(content) {
+        if (!content) return '<p>No content available.</p>';
+        
+        // Simple paragraph formatting
+        const paragraphs = content.split('\n\n');
+        return paragraphs.map(p => `<p>${this.escapeHtml(p)}</p>`).join('');
+    }
+    
+    async trackEvent(articleId, eventType, data = {}) {
+        try {
+            await fetch(`${this.apiBase}/track`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    article_id: articleId,
+                    event_type: eventType,
+                    ...data
+                })
+            });
+        } catch (error) {
+            console.error('Failed to track event:', error);
+        }
+    }
+    
+    refreshFeed() {
+        this.articles = [];
+        this.currentOffset = 0;
+        this.hasMore = true;
+        document.getElementById('end-of-feed').classList.add('hidden');
+        this.loadArticles();
+    }
+    
+    loadSettings() {
+        const saved = localStorage.getItem('wikipediaFeedSettings');
+        if (saved) {
+            this.settings = { ...this.settings, ...JSON.parse(saved) };
+            
+            // Apply settings
+            document.body.setAttribute('data-theme', 
+                localStorage.getItem('darkMode') === 'true' ? 'dark' : 'light');
+            document.getElementById('feed-mix').value = this.settings.feedMix;
+            document.getElementById('articles-per-page').value = this.settings.articlesPerPage;
+            document.getElementById('font-size').value = this.settings.fontSize;
+        }
+    }
+    
+    saveSettings() {
+        this.settings.feedMix = parseFloat(document.getElementById('feed-mix').value);
+        this.settings.articlesPerPage = parseInt(document.getElementById('articles-per-page').value);
+        this.settings.fontSize = parseInt(document.getElementById('font-size').value);
+        
+        localStorage.setItem('wikipediaFeedSettings', JSON.stringify(this.settings));
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', () => {
+    window.feed = new WikipediaFeed();
+});

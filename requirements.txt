@@ -1,0 +1,12 @@
+# Wikipedia Feed Dependencies
+
+flask>=2.0.0
+requests>=2.28.0
+
+# Optional: For local ZIM file support
+# Requires libzim C library installation
+# libzim>=0.1.0
+# See: https://github.com/openzim/libzim
+
+# Optional: For production
+# gunicorn>=21.0.0

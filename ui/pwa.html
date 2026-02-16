@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="description" content="Wikipedia Feed - Browse Wikipedia articles offline or online">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WikiFeed">
+    
+    <title>Wikipedia Feed</title>
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <!-- Same HTML as web version -->
+    <div id="source-picker" class="screen">
+        <div class="picker-container">
+            <h1>📚 Wikipedia Feed</h1>
+            <p class="subtitle">Choose your source</p>
+            
+            <div class="source-options">
+                <button id="source-local" class="source-btn disabled" disabled>
+                    <span class="source-icon">💾</span>
+                    <span class="source-title">Local (ZIM)</span>
+                    <span class="source-desc">Works offline • No categories</span>
+                    <span class="source-status" id="local-status">Checking...</span>
+                </button>
+                
+                <button id="source-live" class="source-btn">
+                    <span class="source-icon">🌐</span>
+                    <span class="source-title">Live Wikipedia</span>
+                    <span class="source-desc">Requires internet • Full categories</span>
+                    <span class="source-status">Available</span>
+                </button>
+            </div>
+            
+            <p class="source-note">
+                <small>Live mode fetches articles from Wikipedia API. No download required.</small>
+            </p>
+        </div>
+    </div>
+
+    <div id="user-picker" class="screen hidden">
+        <div class="picker-container">
+            <h1>📚 Wikipedia Feed</h1>
+            <p class="subtitle">Who's reading today?</p>
+            
+            <div id="user-list" class="user-list"></div>
+            
+            <div class="new-user-form">
+                <input type="text" id="new-user-name" placeholder="Enter your name..." maxlength="20">
+                <button id="add-user-btn" class="btn-primary">+ Add User</button>
+            </div>
+            
+            <button id="guest-btn" class="btn-guest">Continue as Guest</button>
+        </div>
+    </div>
+
+    <div id="main-feed" class="screen hidden">
+        <header class="feed-header">
+            <div class="header-top">
+                <h1>📚 Wikipedia Feed</h1>
+                <div class="source-indicator">
+                    <span id="source-badge">🌐 Live</span>
+                    <button id="switch-source-btn" class="btn-small">Switch</button>
+                </div>
+            </div>
+            
+            <div class="user-info-bar">
+                <span id="current-user-name"></span>
+                <button id="switch-user-btn" class="btn-small">Switch</button>
+            </div>
+            
+            <div class="algorithm-bar">
+                <label>Algorithm:</label>
+                <select id="algorithm-select">
+                    <option value="random">🎲 Random</option>
+                    <option value="user_based">👤 User-Based</option>
+                    <option value="jeopardy">📺 Jeopardy</option>
+                    <option value="category">🏷️ Category</option>
+                </select>
+                
+                <select id="category-select" class="hidden">
+                    <option value="">Select Category</option>
+                    <option value="Science">🔬 Science</option>
+                    <option value="History">🏛️ History</option>
+                    <option value="Geography">🌍 Geography</option>
+                    <option value="Literature">📖 Literature</option>
+                    <option value="Arts">🎨 Arts</option>
+                    <option value="Sports">⚽ Sports</option>
+                    <option value="Politics">🏛️ Politics</option>
+                    <option value="Religion">⛪ Religion</option>
+                    <option value="Nature">🌿 Nature</option>
+                    <option value="Technology">💻 Technology</option>
+                    <option value="People">👤 People</option>
+                </select>
+                
+                <div id="user-stats" class="user-stats hidden">
+                    <span id="click-count">0 clicks</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="feed-container" id="feed-container"></main>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Loading articles...</p>
+        </div>
+
+        <div id="no-more" class="no-more hidden">
+            <p>No more articles</p>
+        </div>
+    </div>
+
+    <div id="article-modal" class="modal hidden">
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">&times;</button>
+            <article id="article-content"></article>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    
+    <!-- Service Worker for PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => {
+                console.log('SW registration failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>
