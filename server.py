@@ -254,11 +254,68 @@ def map_categories(wiki_categories):
     return list(matched) if matched else ['General']
 
 
+def get_grokipedia_articles(limit=20):
+    """Get random articles from Grokipedia (AI knowledge base)."""
+    try:
+        from grokipedia_api import GrokipediaClient
+    except ImportError:
+        return [{"error": "grokipedia-api not installed. Run: pip install grokipedia-api"}]
+    
+    articles = []
+    client = GrokipediaClient()
+    
+    # Predefined interesting topics for variety
+    topics = [
+        'Artificial Intelligence', 'Bitcoin', 'Quantum Computing', 'Space Exploration',
+        'Climate Change', 'CRISPR', 'Neural Network', 'Machine Learning', 'Blockchain',
+        'Internet of Things', '5G', 'Augmented Reality', 'Virtual Reality',
+        'Nuclear Fusion', 'Gene Editing', 'Renewable Energy', 'Electric Vehicle',
+        'Deep Learning', 'Computer Vision', 'Natural Language Processing',
+        'Robotics', 'Automation', 'Cybersecurity', 'Cloud Computing',
+        'Distributed Computing', 'Cryptography', 'Smart Contract', 'DAO',
+        'AGI', 'Singularity', 'Transhumanism', 'Posthuman',
+        'Anthropocene', 'Technological Singularity', 'Moore Law'
+    ]
+    
+    import random
+    selected_topics = random.sample(topics, min(limit, len(topics)))
+    
+    for topic in selected_topics:
+        try:
+            results = client.search(topic, limit=1)
+            if results and 'results' in results and len(results['results']) > 0:
+                result = results['results'][0]
+                slug = result.get('slug', '')
+                
+                if slug:
+                    page = client.get_page(slug, include_content=True)
+                    if page and 'page' in page:
+                        page_data = page['page']
+                        content = page_data.get('content_text', '')
+                        
+                        articles.append({
+                            'title': page_data.get('title', topic),
+                            'slug': slug,
+                            'preview': content[:500] + '...' if len(content) > 500 else content,
+                            'content': content,
+                            'categories': ['Grokipedia', 'AI Knowledge'],
+                            'source': 'grokipedia',
+                            'word_count': len(content.split())
+                        })
+        except Exception as e:
+            continue
+    
+    return articles
+
+
 def get_random_articles(limit=20, source='local'):
-    """Get random articles from local ZIM or live Wikipedia."""
+    """Get random articles from local ZIM, live Wikipedia, or Grokipedia."""
     
     if source == 'live':
         return get_live_random_articles(limit)
+    
+    if source == 'grokipedia':
+        return get_grokipedia_articles(limit)
     
     # Local ZIM mode
     import libzim

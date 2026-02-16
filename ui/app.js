@@ -17,6 +17,7 @@ const userPicker = document.getElementById('user-picker');
 const mainFeed = document.getElementById('main-feed');
 const sourceLocal = document.getElementById('source-local');
 const sourceLive = document.getElementById('source-live');
+const sourceGrokipedia = document.getElementById('source-grokipedia');
 const sourceBadge = document.getElementById('source-badge');
 const userList = document.getElementById('user-list');
 const newUserName = document.getElementById('new-user-name');
@@ -68,7 +69,13 @@ function selectSource(source) {
     localStorage.setItem('wiki_source', source);
     
     // Update badge
-    sourceBadge.textContent = source === 'local' ? '💾 Local' : '🌐 Live';
+    if (source === 'local') {
+        sourceBadge.textContent = '💾 Local';
+    } else if (source === 'grokipedia') {
+        sourceBadge.textContent = '🤖 Grokipedia';
+    } else {
+        sourceBadge.textContent = '🌐 Live';
+    }
     
     // Show user picker
     sourcePicker.classList.add('hidden');
@@ -81,7 +88,13 @@ function checkSavedSource() {
     const saved = localStorage.getItem('wiki_source');
     if (saved) {
         currentSource = saved;
-        sourceBadge.textContent = saved === 'local' ? '💾 Local' : '🌐 Live';
+        if (saved === 'local') {
+            sourceBadge.textContent = '💾 Local';
+        } else if (saved === 'grokipedia') {
+            sourceBadge.textContent = '🤖 Grokipedia';
+        } else {
+            sourceBadge.textContent = '🌐 Live';
+        }
         userPicker.classList.remove('hidden');
         loadUsers();
     }
@@ -449,6 +462,7 @@ function setupEventListeners() {
         if (!sourceLocal.disabled) selectSource('local');
     };
     sourceLive.onclick = () => selectSource('live');
+    sourceGrokipedia.onclick = () => selectSource('grokipedia');
     
     // User creation
     addUserBtn.onclick = createUser;
